@@ -84,15 +84,15 @@ function slackResponseBody(
   players: string[]
 ) {
   const successMessage = `${attempts
-    .map((attempt) => formattedDiff(attempt, characters, true))
+    .map((attempt) => formattedDiff(attempt, word, true))
     .join("\n>")}`;
 
   const attemptsFormatted = `${attempts
     .map(
       (attempt) =>
-        `${formattedDiff(attempt, characters, true)} - ${formattedDiff(
+        `${formattedDiff(attempt, word, true)} - ${formattedDiff(
           attempt,
-          characters,
+          word,
           false
         )}`
     )
@@ -142,57 +142,38 @@ export enum StatusEmoji {
   none = ":white_circle:",
 }
 
-export function characterDiff(
+export function characterDiff2(
   guess: string,
-  wordCharacterMap: { [char: string]: number[] }
-) {
-  const guessCharacterMap: { [char: string]: Set<number> } = {};
-  const diff: { [index: number]: [string, MatchStatus] } = {};
-  for (let index = 0; index < guess.length; index++) {
-    if (guessCharacterMap[guess[index]]) {
-      guessCharacterMap[guess[index]] =
-        guessCharacterMap[guess[index]].add(index);
+  word: string
+): [string, MatchStatus][] {
+  const guessLetters = guess.split("");
+  const wordLetters = word.split("");
+  const unmatchedLetters: string[] = [];
+  const diff: [string, MatchStatus][] = wordLetters.map((letter, index) => {
+    if (guessLetters[index] === letter) {
+      return [letter, MatchStatus.full];
     } else {
-      guessCharacterMap[guess[index]] = new Set<number>().add(index);
-    }
-  }
-  Object.entries(guessCharacterMap).forEach(([guessCharacter, indexSet]) => {
-    const actualIndexes = wordCharacterMap[guessCharacter];
-    let fullMatchCount = 0;
-    let totalCharacterCount = actualIndexes?.length || 0;
-    if (!actualIndexes?.length) {
-      Array.from(indexSet.values()).forEach(
-        (index) => (diff[index] = [guessCharacter, MatchStatus.none])
-      );
-    } else {
-      actualIndexes.forEach((actualIndex) => {
-        if (indexSet.has(actualIndex)) {
-          diff[actualIndex] = [guessCharacter, MatchStatus.full];
-          fullMatchCount += 1;
-          indexSet.delete(actualIndex);
-        }
-      });
-      Array.from(indexSet.values())
-        .sort()
-        .slice(0, totalCharacterCount - fullMatchCount)
-        .forEach((index) => {
-          diff[index] = [guessCharacter, MatchStatus.partial];
-          indexSet.delete(index);
-        });
-      Array.from(indexSet.values()).forEach(
-        (index) => (diff[index] = [guessCharacter, MatchStatus.none])
-      );
+      unmatchedLetters.push(letter);
+      return [guessLetters[index], MatchStatus.none];
     }
   });
-  return Object.values(diff);
+  return diff.map(([letter, status]) => {
+    if (status === MatchStatus.full) {
+      return [letter, status];
+    } else {
+      const unmatchIndex = unmatchedLetters.indexOf(letter);
+      if (unmatchIndex > -1) {
+        unmatchedLetters[unmatchIndex] = "";
+        return [letter, MatchStatus.partial];
+      } else {
+        return [letter, status];
+      }
+    }
+  });
 }
 
-function formattedDiff(
-  word: string,
-  characters: { [c: string]: number[] },
-  abstract = false
-) {
-  const diff = characterDiff(word, characters);
+function formattedDiff(guess: string, word: string, abstract = false) {
+  const diff = characterDiff2(guess, word);
   return diff
     .map(([character, status]) => {
       switch (status) {
