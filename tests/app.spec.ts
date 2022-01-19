@@ -1,6 +1,6 @@
 import request from "supertest";
 import { Express } from "express-serve-static-core";
-import app, { GAMES, GAME_ID } from "../src/app";
+import app, { characterDiff, GAMES, GAME_ID, MatchStatus } from "../src/app";
 import { WordleGame } from "../src/game";
 
 let server: Express;
@@ -68,12 +68,12 @@ describe('Wordle Slack Bot"', () => {
           if (err) return done(err);
           expect(JSON.parse(res.text)).toEqual({
             type: "mrkdwn",
-            text: "Your guesses: \n>:white_circle:‎:large_orange_circle:‎:large_orange_circle:‎:large_orange_circle:‎:large_orange_circle: - h‎E‎L‎L‎O",
+            text: "Your guesses: \n>:white_circle:‎:large_orange_circle:‎:large_orange_circle:‎:white_circle:‎:large_orange_circle: - h‎E‎L‎l‎O",
           });
           done();
         });
     });
-    it("should notify the user when the guess is incorrect", (done) => {
+    it("should notify the user when the guess is correct", (done) => {
       request(server)
         .post("/wordle/guess")
         .send({ text: "novel", user_name: "csk" })
@@ -102,5 +102,57 @@ describe('Wordle Slack Bot"', () => {
           done();
         });
     });
+    it("should notify other users when there is a winner", (done) => {
+      request(server)
+        .post("/wordle/guess")
+        .send({ text: "novel", user_name: "csk" })
+        .expect(200)
+        .end(() => {});
+
+      request(server)
+        .post("/wordle/guess")
+        .send({ text: "novel", user_name: "vagabond" })
+        .end((err, res) => {
+          if (err) return done(err);
+          expect(res.text.includes("the winner is <@csk>")).toBeTruthy();
+          done();
+        });
+    });
+  });
+});
+
+describe("guessDiff", () => {
+  it("should return correct diff", () => {
+    const game = new WordleGame("reada");
+    const actual = characterDiff("AAAAB", game.CHARACTER_MAP);
+    expect(actual).toEqual([
+      ["A", MatchStatus.partial],
+      ["A", MatchStatus.none],
+      ["A", MatchStatus.full],
+      ["A", MatchStatus.none],
+      ["B", MatchStatus.none],
+    ]);
+  });
+  it("should return correct diff", () => {
+    const game = new WordleGame("READY");
+    const actual = characterDiff("DRAMA", game.CHARACTER_MAP);
+    expect(actual).toEqual([
+      ["D", MatchStatus.partial],
+      ["R", MatchStatus.partial],
+      ["A", MatchStatus.full],
+      ["M", MatchStatus.none],
+      ["A", MatchStatus.none],
+    ]);
+  });
+  it("should return correct diff", () => {
+    const game = new WordleGame("HELLO");
+    const actual = characterDiff("HLOLO", game.CHARACTER_MAP);
+    expect(actual).toEqual([
+      ["H", MatchStatus.full],
+      ["L", MatchStatus.partial],
+      ["O", MatchStatus.none],
+      ["L", MatchStatus.full],
+      ["O", MatchStatus.full],
+    ]);
   });
 });

@@ -64,7 +64,7 @@ app.post("/wordle/guess/", async (req, res) => {
     } else if (error instanceof GameFinished) {
       return res.send(
         game.winner
-          ? `The game is finished, the winner is <@${userName}>\n>Answer: ${game.word}`
+          ? `The game is finished, the winner is <@${game.winner}>\n>Answer: ${game.word}`
           : `The game is finished.\n>Answer: ${game.word}`
       );
     }
@@ -131,21 +131,78 @@ function slackResponseBody(
       };
 }
 
+export enum MatchStatus {
+  full,
+  partial,
+  none,
+}
+export enum StatusEmoji {
+  full = ":large_green_circle:",
+  partial = ":large_orange_circle:",
+  none = ":white_circle:",
+}
+
+export function characterDiff(
+  guess: string,
+  wordCharacterMap: { [char: string]: number[] }
+) {
+  const guessCharacterMap: { [char: string]: Set<number> } = {};
+  const diff: { [index: number]: [string, MatchStatus] } = {};
+  for (let index = 0; index < guess.length; index++) {
+    if (guessCharacterMap[guess[index]]) {
+      guessCharacterMap[guess[index]] =
+        guessCharacterMap[guess[index]].add(index);
+    } else {
+      guessCharacterMap[guess[index]] = new Set<number>().add(index);
+    }
+  }
+  Object.entries(guessCharacterMap).forEach(([guessCharacter, indexSet]) => {
+    const actualIndexes = wordCharacterMap[guessCharacter];
+    let fullMatchCount = 0;
+    let totalCharacterCount = actualIndexes?.length || 0;
+    if (!actualIndexes?.length) {
+      Array.from(indexSet.values()).forEach(
+        (index) => (diff[index] = [guessCharacter, MatchStatus.none])
+      );
+    } else {
+      actualIndexes.forEach((actualIndex) => {
+        if (indexSet.has(actualIndex)) {
+          diff[actualIndex] = [guessCharacter, MatchStatus.full];
+          fullMatchCount += 1;
+          indexSet.delete(actualIndex);
+        }
+      });
+      Array.from(indexSet.values())
+        .sort()
+        .slice(0, totalCharacterCount - fullMatchCount)
+        .forEach((index) => {
+          diff[index] = [guessCharacter, MatchStatus.partial];
+          indexSet.delete(index);
+        });
+      Array.from(indexSet.values()).forEach(
+        (index) => (diff[index] = [guessCharacter, MatchStatus.none])
+      );
+    }
+  });
+  return Object.values(diff);
+}
+
 function formattedDiff(
   word: string,
   characters: { [c: string]: number[] },
   abstract = false
 ) {
-  const diff = [];
-  for (let index = 0; index < word.length; index++) {
-    const character = word[index];
-    if (!characters[character]?.length) {
-      diff.push(abstract ? ":white_circle:" : `${character.toLowerCase()}`);
-    } else if (characters[character].includes(index)) {
-      diff.push(abstract ? ":large_green_circle:" : `*${character}*`);
-    } else {
-      diff.push(abstract ? ":large_orange_circle:" : character);
-    }
-  }
-  return diff.join("‎");
+  const diff = characterDiff(word, characters);
+  return diff
+    .map(([character, status]) => {
+      switch (status) {
+        case MatchStatus.full:
+          return abstract ? StatusEmoji.full : `*${character}*`;
+        case MatchStatus.partial:
+          return abstract ? StatusEmoji.partial : character;
+        case MatchStatus.none:
+          return abstract ? StatusEmoji.none : character.toLowerCase();
+      }
+    })
+    .join("‎");
 }
