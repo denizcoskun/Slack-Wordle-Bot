@@ -1,12 +1,6 @@
 import request from "supertest";
 import { Express } from "express-serve-static-core";
-import app, {
-  characterDiff,
-  characterDiff2,
-  GAMES,
-  GAME_ID,
-  MatchStatus,
-} from "../src/app";
+import app, { wordDiff3, GAMES, GAME_ID, MatchStatus } from "../src/app";
 import { WordleGame } from "../src/game";
 
 let server: Express;
@@ -129,19 +123,20 @@ describe('Wordle Slack Bot"', () => {
 
 describe("guessDiff", () => {
   it("should return correct diff", () => {
-    const game = new WordleGame("reada");
-    const actual = characterDiff2("AAAAB", game.word);
+    const game = new WordleGame("readaa");
+    const actual = wordDiff3("AAAABC", game.word);
     expect(actual).toEqual([
       ["A", MatchStatus.partial],
-      ["A", MatchStatus.none],
+      ["A", MatchStatus.partial],
       ["A", MatchStatus.full],
       ["A", MatchStatus.none],
       ["B", MatchStatus.none],
+      ["C", MatchStatus.none],
     ]);
   });
   it("should return correct diff", () => {
     const game = new WordleGame("READY");
-    const actual = characterDiff2("DRAMA", game.word);
+    const actual = wordDiff3("DRAMA", game.word);
     expect(actual).toEqual([
       ["D", MatchStatus.partial],
       ["R", MatchStatus.partial],
@@ -152,11 +147,11 @@ describe("guessDiff", () => {
   });
   it("should return correct diff", () => {
     const game = new WordleGame("HELLO");
-    const actual = characterDiff2("HLOLO", game.word);
+    const actual = wordDiff3("HLOLO", game.word);
     expect(actual).toEqual([
       ["H", MatchStatus.full],
       ["L", MatchStatus.partial],
-      ["O", MatchStatus.none],
+      ["O", MatchStatus.partial],
       ["L", MatchStatus.full],
       ["O", MatchStatus.full],
     ]);

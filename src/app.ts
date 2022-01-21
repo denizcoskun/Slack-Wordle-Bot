@@ -142,38 +142,33 @@ export enum StatusEmoji {
   none = ":white_circle:",
 }
 
-export function characterDiff2(
-  guess: string,
-  word: string
-): [string, MatchStatus][] {
-  const guessLetters = guess.split("");
-  const wordLetters = word.split("");
-  const unmatchedLetters: string[] = [];
-  const diff: [string, MatchStatus][] = wordLetters.map((letter, index) => {
-    if (guessLetters[index] === letter) {
-      return [letter, MatchStatus.full];
+type LetterDiff = [string, MatchStatus];
+export function wordDiff3(guess: string, word: string): LetterDiff[] {
+  const diff: LetterDiff[] = [];
+  const wordMap: { [char: string]: number } = {};
+  for (let index = 0; index < word.length; index++) {
+    const letter = word[index];
+    wordMap[letter] = (wordMap[letter] || 0) + 1;
+  }
+  for (let idx = 0; idx < word.length; idx++) {
+    const guessLetter = guess[idx];
+    if (guessLetter === word[idx]) {
+      wordMap[guessLetter] -= 1;
+      diff.push([guessLetter, MatchStatus.full]);
     } else {
-      unmatchedLetters.push(letter);
-      return [guessLetters[index], MatchStatus.none];
-    }
-  });
-  return diff.map(([letter, status]) => {
-    if (status === MatchStatus.full) {
-      return [letter, status];
-    } else {
-      const unmatchIndex = unmatchedLetters.indexOf(letter);
-      if (unmatchIndex > -1) {
-        unmatchedLetters[unmatchIndex] = "";
-        return [letter, MatchStatus.partial];
+      if (wordMap[guessLetter] > 0) {
+        wordMap[guessLetter] -= 1;
+        diff.push([guessLetter, MatchStatus.partial]);
       } else {
-        return [letter, status];
+        diff.push([guessLetter, MatchStatus.none]);
       }
     }
-  });
+  }
+  return diff;
 }
 
 function formattedDiff(guess: string, word: string, abstract = false) {
-  const diff = characterDiff2(guess, word);
+  const diff = wordDiff3(guess, word);
   return diff
     .map(([character, status]) => {
       switch (status) {
